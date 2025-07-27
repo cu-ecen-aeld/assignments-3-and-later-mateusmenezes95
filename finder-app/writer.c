@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
   setlogmask(LOG_UPTO (LOG_DEBUG));
   openlog("writer", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_USER);
 
-	if (strcmp(argv[1], "-h") == 0) {
+	if ((argc == 2) && (strcmp(argv[1], "-h") == 0)) {
 		printf("Usage: writer [FILE_PATH] [STRING_TO_WRITE_TO]");
     return 0;
 	}
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
 			LOG_ERR,
 			"Expected 2 arguments, but only %d was given. "
 			"Run the app with -h or --help for arguments suggestions",
-			argc);
+			argc - 1);  // argc will always contains the executable name. Thus the subtraction
 		return 1;
   }
 
