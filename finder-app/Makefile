@@ -5,3 +5,6 @@ all: writer
 writer: writer.c
 	$(CROSS_COMPILE) writer.c -o writer
 
+clean:
+	rm writer
+
