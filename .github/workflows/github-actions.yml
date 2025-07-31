@@ -3,12 +3,13 @@ on: [push]
 jobs:
     unit-test:
         container: cuaesd/aesd-autotest:unit-test
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
         steps:
           - uses: actions/checkout@v2
-            name: Checkout submodules
-          - uses: textbook/git-checkout-submodule-action@2.1.1
-          - run: ./unit-test.sh
+          - name: Checkout submodules
+            run: git submodule update --init --recursive
+          - name: Run unit test
+            run: ./unit-test.sh
     full-test:
         container: cuaesd/aesd-autotest:unit-test
         runs-on: ubuntu-22.04
@@ -16,6 +17,6 @@ jobs:
           - uses: actions/checkout@v2
           - name: Checkout submodules
             run : git submodule update --init --recursive
-          - name: Run unit test
+          - name: Run full test
             run: ./full-test.sh
 
