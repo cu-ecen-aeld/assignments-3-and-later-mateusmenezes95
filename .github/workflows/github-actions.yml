@@ -13,6 +13,7 @@ jobs:
     full-test:
         container: cuaesd/aesd-autotest:24-assignment3
         runs-on: ubuntu-22.04
+        timeout-minutes: 120
         steps:
           - uses: actions/checkout@v2
           - name: Checkout submodules
