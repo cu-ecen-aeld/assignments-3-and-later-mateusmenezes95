@@ -66,11 +66,9 @@ set +e
 echo ${OUTPUTSTRING} | grep "${MATCHSTR}"
 if [ $? -eq 0 ]; then
 	echo "success"
+	echo ${OUTPUTSTRING} > /tmp/assignment4-result.txt
 	exit 0
 else
 	echo "failed: expected  '${MATCHSTR}' in '${OUTPUTSTRING}' but instead found"
 	exit 1
 fi
-
-echo ${OUTPUTSTRING} > /tmp/assignment4-result.txt
-
