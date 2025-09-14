@@ -1,9 +1,9 @@
-CROSS_COMPILE ?= gcc
+CC ?= gcc
 
 all: writer
 
 writer: writer.c
-	$(CROSS_COMPILE) writer.c -o writer
+	$(CC) writer.c -o writer
 
 clean:
 	rm -f writer
