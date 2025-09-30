@@ -20,6 +20,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -29,6 +30,19 @@
 #include <unistd.h>
 
 #define LIMIT_OF_INCOMING_CONNECTIONS 10
+#define BUFFER_SIZE 1024
+
+struct read_buffer {
+  char data[BUFFER_SIZE];
+  size_t qty_bytes_read;
+};
+
+struct file_context {
+  size_t file_size;
+  int fd;
+  int flags;
+  mode_t mode;
+};
 
 int main(void) {
   openlog("aesdsocket", LOG_PID | LOG_CONS, LOG_USER);
@@ -89,19 +103,44 @@ int main(void) {
     return -1;
   }
 
-  uint8_t buffer[1024];
-  ssize_t read_bytes = recv(connection_fd, buffer, sizeof(buffer) - 1, 0);
-  if (read_bytes == -1) {
-    syslog(LOG_ERR, "Error on receiving data: %s", strerror(errno));
-    close(connection_fd);
-    close(sockfd);
+  struct file_context file_ctx;
+  struct read_buffer buffer;
+  memset(&file_ctx, 0, sizeof(struct file_context));
+
+  file_ctx.flags = O_CREAT | O_RDWR | O_APPEND | O_TRUNC;
+  file_ctx.mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
+  file_ctx.fd = open("/var/tmp/aesdsocketdata", file_ctx.flags, file_ctx.mode);
+  if (file_ctx.fd == -1) {
+    syslog(LOG_ERR, "Error on creating the tmp file: %s\n", strerror(errno));
+    closelog();
     return -1;
   }
 
-  buffer[read_bytes] = '\0';  // Null-terminate the received data
-  syslog(LOG_INFO, "Received data: %s", buffer);
-  printf("Received data: %s\n", buffer);
+  while (1) {
+    buffer.qty_bytes_read = recv(connection_fd, &buffer.data, BUFFER_SIZE, 0);
+    if (buffer.qty_bytes_read == -1) {
+      if (errno == EINTR) continue;  // Retry if interrupted by signal
+      syslog(LOG_ERR, "Error on receiving data: %s", strerror(errno));
+      close(connection_fd);
+      close(sockfd);
+      return -1;
+    }
 
+    char * first_end_str;
+    first_end_str = strchr(buffer.data, '\n');
+    if (first_end_str != NULL) {
+      file_ctx.file_size += buffer.qty_bytes_read;
+      int str_size = first_end_str - buffer.data;
+      ssize_t bytes_written = write(file_ctx.fd, buffer.data, str_size);
+      if (bytes_written < str_size) {
+        syslog(LOG_WARNING, "Partial written. Expected to write %d, but only %ld was written",
+        str_size, bytes_written);
+      }
+      memset(&buffer, 0, sizeof(struct read_buffer));
+    }
+  }
+
+  close(file_ctx.fd);
   close(connection_fd);
   close(sockfd);
 
