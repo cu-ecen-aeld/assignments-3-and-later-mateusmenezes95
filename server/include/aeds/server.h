@@ -76,6 +76,9 @@ void aesd_server_start_accept_connections(aesd_server_t * aesd_server);
 aesd_server_ret_t
 aesd_server_get_line(aesd_server_t * aesd_server, void * buf, size_t buf_len, size_t * line_size);
 
+aesd_server_ret_t
+aesd_server_send_file_content(aesd_server_t * aesd_server, int file_fd);
+
 #ifdef __cplusplus
 }
 #endif

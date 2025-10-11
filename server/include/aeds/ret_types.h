@@ -33,8 +33,11 @@ typedef int32_t aesd_ret_t;
 typedef int32_t aesd_server_ret_t;
 
 #define AESD_SERVER_RET_ERROR AESD_RET_ERROR
+#define AESD_SERVER_RET_OK AESD_RET_OK
 #define AESD_SERVER_RET_EOL_FOUND AESD_RET_OK
 /// The read method does not found any '\n' in the buffer
 #define AESD_SERVER_RET_EOL_NOT_FOUND 2
+#define AESD_SERVER_RET_NO_BYTES_READ 3
+#define AESD_SERVER_RET_BUF_FULL 4
 
 #endif  // SERVER_INCLUDE_AEDS_RET_TYPES_H_

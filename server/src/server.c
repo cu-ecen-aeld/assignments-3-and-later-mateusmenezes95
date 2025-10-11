@@ -29,7 +29,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -157,13 +159,17 @@ aesd_server_start_accept_connections(aesd_server_t * aesd_server)
 {
     struct sockaddr_storage client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
+
     aesd_server->impl->connection_fd = accept(
         aesd_server->impl->socket_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+
     if (aesd_server->impl->connection_fd == -1) {
         if (EINTR == errno) {
-            printf("Accept connection interrupted by a signal");
+            syslog(LOG_INFO, "Accept connection interrupted by a signal");
         }
+
         syslog(LOG_ERR, "Error on accepting new connection: %s", strerror(errno));
+
         aesd_server->impl->connection_accepted = false;
         close(aesd_server->impl->socket_fd);
         return;
@@ -233,9 +239,8 @@ aesd_server_get_line(aesd_server_t * aesd_server, void * buf, size_t buf_len, si
     while (total_bytes_read < buf_len) {
         num_bytes_read = recv(aesd_server->impl->connection_fd,
             this_buf + num_bytes_read, buf_len - total_bytes_read, 0);
-        AESD_LOG_WITH_FUNC_DEBUG("Received %ld bytes", num_bytes_read);
         if (num_bytes_read == 0) {
-            return AESD_SERVER_RET_EOL_NOT_FOUND;
+            return AESD_SERVER_RET_NO_BYTES_READ;
         }
 
         if (num_bytes_read == -1) {
@@ -249,14 +254,49 @@ aesd_server_get_line(aesd_server_t * aesd_server, void * buf, size_t buf_len, si
 
         first_end_str = memchr(buf, '\n', num_bytes_read);
         if (first_end_str != NULL) {
-            *line_size = this_buf - first_end_str;
+            *line_size = first_end_str - this_buf;
             AESD_LOG_WITH_FUNC_DEBUG("End of line found at buf[%ld]", *line_size);
             return AESD_SERVER_RET_EOL_FOUND;
+        }
+
+        if (buf_len == num_bytes_read) {
+            return AESD_SERVER_RET_BUF_FULL;
         }
 
         total_bytes_read += num_bytes_read;
     }
 
+    *line_size = 0;
+
     return AESD_SERVER_RET_EOL_NOT_FOUND;
 }
 
+aesd_server_ret_t
+aesd_server_send_file_content(aesd_server_t * aesd_server, int file_fd) {
+    if (file_fd < 0) {
+        AESD_LOG_WITH_FUNC_ERR("Invalid file descriptor passed. Value is %d", file_fd);
+        return AESD_SERVER_RET_ERROR;
+    }
+
+    struct stat file_stat;
+    if (fstat(file_fd, &file_stat) == -1) {
+        AESD_LOG_WITH_FUNC_ERR("File does not exist or cannot be accessed: %s", strerror(errno));
+        return AESD_SERVER_RET_ERROR;
+    }
+
+    off_t file_offset = 0;  // Always read from the begin of the file
+    int ret = sendfile(aesd_server->impl->connection_fd, file_fd, &file_offset, file_stat.st_size);
+
+    if (ret == -1) {
+        AESD_LOG_WITH_FUNC_ERR("Error on transferring data between fds: %s", strerror(errno));
+        return AESD_SERVER_RET_ERROR;
+    }
+
+    if (ret != file_stat.st_size) {
+        AESD_LOG_WITH_FUNC_ERR(
+            "Expected to transfer %ld, but only %d was transferred", file_stat.st_size, ret);
+        return AESD_SERVER_RET_ERROR;
+    }
+
+    return AESD_SERVER_RET_OK;
+}

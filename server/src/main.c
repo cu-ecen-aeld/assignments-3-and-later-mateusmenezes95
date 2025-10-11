@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #define BUFFER_SIZE 1024
+const char * const TMP_FILE = "/var/tmp/aesdsocketdata";
 
 struct read_buffer {
   char data[BUFFER_SIZE];
@@ -73,7 +74,7 @@ int main(void) {
 
   file_ctx.flags = O_CREAT | O_RDWR | O_APPEND | O_TRUNC;
   file_ctx.mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
-  file_ctx.fd = open("/var/tmp/aesdsocketdata", file_ctx.flags, file_ctx.mode);
+  file_ctx.fd = open(TMP_FILE, file_ctx.flags, file_ctx.mode);
   if (file_ctx.fd == -1) {
     syslog(LOG_ERR, "Error on creating the tmp file: %s\n", strerror(errno));
     closelog();
@@ -87,23 +88,57 @@ int main(void) {
     syslog(LOG_INFO, "Server created sucessfully");
   }
 
-  aesd_server_start_accept_connections(aesd_server);
-
   int get_line_ret = AESD_SERVER_RET_EOL_NOT_FOUND;
   size_t line_size;
+  ssize_t bytes_written;
   while (!sigint_or_sigterm_recved) {
+    if (get_line_ret != AESD_SERVER_RET_BUF_FULL) {
+      aesd_server_start_accept_connections(aesd_server);
+    }
+
     get_line_ret = aesd_server_get_line(aesd_server, buffer.data, BUFFER_SIZE, &line_size);
-    if (get_line_ret == AESD_SERVER_RET_EOL_FOUND) {
-      if (line_size + 1 < BUFFER_SIZE) buffer.data[line_size] = '\0';
-      printf("Received: %s", buffer.data);
+
+    if (get_line_ret != AESD_SERVER_RET_ERROR && get_line_ret != AESD_SERVER_RET_NO_BYTES_READ) {
+      line_size = get_line_ret == AESD_SERVER_RET_BUF_FULL ? BUFFER_SIZE : line_size + 1;
+      bytes_written = write(file_ctx.fd, buffer.data, line_size);
+
+      if (bytes_written == -1) {
+        syslog(LOG_ERR, "Error while writting to file %s: %s", TMP_FILE, strerror(errno));
+        break;
+      }
+
+      if (bytes_written != line_size) {
+        syslog(LOG_ERR,
+          "Invalid write. Expected write %ld, written %ld however", line_size, bytes_written);
+        break;
+      }
+
+      if (AESD_SERVER_RET_EOL_FOUND == get_line_ret) {
+        if (aesd_server_send_file_content(aesd_server, file_ctx.fd) == AESD_SERVER_RET_ERROR) {
+          break;
+        }
+      }
     }
   }
 
   if (sigint_or_sigterm_recved) {
-    printf("Received %s\n", sign_recved == SIGINT ? "SIGINT" : "SIGTERM");
+    syslog(LOG_INFO, "Received %s\n", sign_recved == SIGINT ? "SIGINT" : "SIGTERM");
   }
 
   aesd_server_destroy(aesd_server);
+
+  if (close(file_ctx.fd) == -1) {
+    syslog(LOG_ERR, "Error on closing the fd for the file %s: %s", TMP_FILE, strerror(errno));
+  } else {
+    syslog(LOG_INFO, "fd of the file %s closed successfully", TMP_FILE);
+  }
+
+  if (unlink(TMP_FILE) == -1) {
+    syslog(LOG_ERR, "Error deleting file %s: %s", TMP_FILE, strerror(errno));
+  } else {
+    syslog(LOG_INFO, "File %s deleted successfully", TMP_FILE);
+  }
+
   closelog();
   return 0;
 }
