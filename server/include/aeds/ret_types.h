@@ -26,15 +26,15 @@
 typedef int32_t aesd_ret_t;
 
 /// The operation ran as expected
-#define AESD_RET_OK 0
+#define AESD_RET_OK 1
 /// Generic error to indicate operation could not complete successfully
-#define AESD_RET_ERROR 1
+#define AESD_RET_ERROR -1
 
 typedef int32_t aesd_server_ret_t;
 
 #define AESD_SERVER_RET_ERROR AESD_RET_ERROR
 #define AESD_SERVER_RET_EOL_FOUND AESD_RET_OK
 /// The read method does not found any '\n' in the buffer
-#define AESD_SERVER_RET_EOL_NOT_FOUND 
+#define AESD_SERVER_RET_EOL_NOT_FOUND 2
 
 #endif  // SERVER_INCLUDE_AEDS_RET_TYPES_H_

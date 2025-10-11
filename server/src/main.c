@@ -89,10 +89,14 @@ int main(void) {
 
   aesd_server_start_accept_connections(aesd_server);
 
+  int get_line_ret = AESD_SERVER_RET_EOL_NOT_FOUND;
+  size_t line_size;
   while (!sigint_or_sigterm_recved) {
-    printf("Before");
-    (void)aesd_server_get_line(aesd_server, buffer.data, BUFFER_SIZE, NULL);
-    printf("after");
+    get_line_ret = aesd_server_get_line(aesd_server, buffer.data, BUFFER_SIZE, &line_size);
+    if (get_line_ret == AESD_SERVER_RET_EOL_FOUND) {
+      if (line_size + 1 < BUFFER_SIZE) buffer.data[line_size] = '\0';
+      printf("Received: %s", buffer.data);
+    }
   }
 
   if (sigint_or_sigterm_recved) {

@@ -157,7 +157,6 @@ aesd_server_start_accept_connections(aesd_server_t * aesd_server)
 {
     struct sockaddr_storage client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
-    syslog(LOG_DEBUG, "tESTE: %d", aesd_server->impl->socket_fd);
     aesd_server->impl->connection_fd = accept(
         aesd_server->impl->socket_fd, (struct sockaddr *)&client_addr, &client_addr_len);
     if (aesd_server->impl->connection_fd == -1) {
@@ -170,8 +169,7 @@ aesd_server_start_accept_connections(aesd_server_t * aesd_server)
         return;
     }
 
-
-    syslog(LOG_INFO, "AESD Server ready to receive connections");
+    syslog(LOG_INFO, "AESD Server ready to receive data");
     aesd_server->impl->connection_accepted = true;
 }
 
@@ -217,33 +215,48 @@ aesd_server_destroy(aesd_server_t * aesd_server)
     }
 }
 
-int
-aesd_servermethod(aesd_server_t * aesd_server)
-{
-    assert(aesd_server);
-
-    // Do something with the aesd_serverect.
-    return 0;
-}
-
 aesd_server_ret_t
 aesd_server_get_line(aesd_server_t * aesd_server, void * buf, size_t buf_len, size_t * line_size) {
-    int qty_bytes_read = recv(aesd_server->impl->connection_fd, buf, buf_len, 0);
-    if (qty_bytes_read == EINTR) {
-        printf("Recv interrupted by signal handler");
+    ssize_t num_bytes_read = 0;
+    size_t total_bytes_read = 0;
+    char * first_end_str;
+    char * this_buf = buf;
+
+    assert(line_size);
+
+    if (aesd_server == NULL) {
+        AESD_LOG_WITH_FUNC_ERR("server is not properly initialized. Passed a null pointer");
+        return -1;
     }
-    if (qty_bytes_read == -1) {
-      syslog(LOG_ERR, "Error on receiving data: %s", strerror(errno));
-      return AESD_SERVER_RET_ERROR;
+
+    total_bytes_read = 0;
+    while (total_bytes_read < buf_len) {
+        num_bytes_read = recv(aesd_server->impl->connection_fd,
+            this_buf + num_bytes_read, buf_len - total_bytes_read, 0);
+        AESD_LOG_WITH_FUNC_DEBUG("Received %ld bytes", num_bytes_read);
+        if (num_bytes_read == 0) {
+            return AESD_SERVER_RET_EOL_NOT_FOUND;
+        }
+
+        if (num_bytes_read == -1) {
+            if (errno == EINTR) {
+                syslog(LOG_INFO, "recv interrupted due to signal handling\n");
+                return AESD_SERVER_RET_ERROR;
+            }
+            syslog(LOG_ERR, "Error during recv call: %s\n", strerror(errno));
+            return AESD_SERVER_RET_ERROR;
+        }
+
+        first_end_str = memchr(buf, '\n', num_bytes_read);
+        if (first_end_str != NULL) {
+            *line_size = this_buf - first_end_str;
+            AESD_LOG_WITH_FUNC_DEBUG("End of line found at buf[%ld]", *line_size);
+            return AESD_SERVER_RET_EOL_FOUND;
+        }
+
+        total_bytes_read += num_bytes_read;
     }
 
-    return AESD_SERVER_RET_ERROR;
-
-    // char * first_end_str;
-    // first_end_str = strchr(buf, '\n');
-    // if (first_end_str != NULL) {
-    //     return AESD_SERVER_RET_OK;
-    // }
-
-    // return AESD_SERVER_RET_OK;
+    return AESD_SERVER_RET_EOL_NOT_FOUND;
 }
+

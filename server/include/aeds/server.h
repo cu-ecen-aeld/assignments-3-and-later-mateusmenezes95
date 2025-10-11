@@ -27,6 +27,10 @@
 
 #define LIMIT_OF_INCOMING_CONNECTIONS 1
 
+#define AESD_LOG_WITH_FUNC_DEBUG(msg, ...) syslog(LOG_DEBUG, "[%s] " msg, __func__, ##__VA_ARGS__)
+#define AESD_LOG_WITH_FUNC_INFO(msg, ...) syslog(LOG_INFO, "[%s] " msg, __func__, ##__VA_ARGS__)
+#define AESD_LOG_WITH_FUNC_ERR(msg, ...) syslog(LOG_ERR, "[%s] " msg, __func__, ##__VA_ARGS__)
+
 typedef struct aesd_server_impl_s aesd_server_impl_t;
 
 typedef struct aesd_server_s {
