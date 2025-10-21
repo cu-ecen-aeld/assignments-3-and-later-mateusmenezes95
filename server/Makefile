@@ -10,8 +10,8 @@ vpath %.h include
 
 all: aesdsocket
 
-aesdsocket: main.c libaesdserver.a
-	$(CC) $(CFLAGS) -o $@ $< libaesdserver.a
+aesdsocket: main.c libaesdserver.a libdaemon.a
+	$(CC) $(CFLAGS) -o $@ $^
 
 libaesdserver.a: server.o
 	ar rcs $@ $<
@@ -19,8 +19,14 @@ libaesdserver.a: server.o
 server.o: server.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+libdaemon.a: become_daemon.o
+	ar rcs $@ $<
+
+become_daemon.o: become_daemon.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 clean:
-	rm -f aesdsocket server.o libaesdserver.a
+	rm -f aesdsocket server.o libaesdserver.a l
 
 # Automatic variables:
 # $@ The filename representing the target.

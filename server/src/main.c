@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <aeds/server.h>
+#include <aeds/become_daemon.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -52,8 +53,16 @@ signal_handler(int sig) {
   sign_recved = sig;
 }
 
-int main(void) {
+int main(int argc, char ** argv) {
+  if (argc > 1 && strcmp(argv[1], "-d") == 0) {
+    becomeDaemon();
+    syslog(LOG_INFO, "Starting server as daemon with PID %d", getpid());
+  } else {
+    syslog(LOG_INFO, "Starting server as foreground process");
+  }
+
   openlog("aesdsocket", LOG_PID | LOG_CONS, LOG_USER);
+
   struct sigaction sig_action;
   sig_action.sa_flags = 0;
   sig_action.sa_handler = signal_handler;
