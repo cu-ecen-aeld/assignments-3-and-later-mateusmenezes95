@@ -20,6 +20,10 @@ jobs:
         timeout-minutes: 120
         steps:
           - uses: actions/checkout@v2
+          - name: Install additional packages
+            run: |
+              apt-get update
+              apt-get install -y netcat-openbsd
           - name: Checkout submodules
             run : git submodule update --init --recursive
           - name: Run full test
