@@ -6,6 +6,10 @@ jobs:
         runs-on: ubuntu-22.04
         steps:
           - uses: actions/checkout@v2
+          - name: Install additional packages
+            run: |
+              apt-get update
+              apt-get install -y netcat-openbsd
           - name: Checkout submodules
             run: git submodule update --init --recursive
           - name: Run unit test
