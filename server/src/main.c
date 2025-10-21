@@ -64,6 +64,7 @@ int main(int argc, char ** argv) {
   openlog("aesdsocket", LOG_PID | LOG_CONS, LOG_USER);
 
   struct sigaction sig_action;
+  memset(&sig_action, 0, sizeof(sig_action));
   sig_action.sa_flags = 0;
   sig_action.sa_handler = signal_handler;
 
