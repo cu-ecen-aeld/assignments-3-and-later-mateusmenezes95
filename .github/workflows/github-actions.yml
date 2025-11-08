@@ -2,28 +2,19 @@ name: assignment-autotest-test
 on: [push]
 jobs:
     unit-test:
-        container: cuaesd/aesd-autotest:unit-test
-        runs-on: ubuntu-22.04
+        container: cuaesd/aesd-autotest:24-unit-test
+        runs-on: self-hosted
         steps:
           - uses: actions/checkout@v2
-          - name: Install additional packages
-            run: |
-              apt-get update
-              apt-get install -y netcat-openbsd
           - name: Checkout submodules
-            run: git submodule update --init --recursive
+            run : git submodule update --init --recursive
           - name: Run unit test
             run: ./unit-test.sh
     full-test:
-        container: cuaesd/aesd-autotest:24-assignment3
-        runs-on: ubuntu-22.04
-        timeout-minutes: 120
+        container: cuaesd/aesd-autotest:24-assignment5
+        runs-on: self-hosted
         steps:
           - uses: actions/checkout@v2
-          - name: Install additional packages
-            run: |
-              apt-get update
-              apt-get install -y netcat-openbsd
           - name: Checkout submodules
             run : git submodule update --init --recursive
           - name: Run full test
