@@ -12,9 +12,11 @@
  * Modifications to the original work:
  *   - Date: 2025-10-21
  *   - Author: mateusmenezes95
- *   - Changes: Removed flag definitions from lines 22, 23, 24, and 26
- *              (BD_NO_CHDIR, BD_NO_CLOSE_FILES, BD_NO_REOPEN_STD_FDS, BD_NO_UMASK0)
- *              to use the default daemon behavior.
+ *   - Changes:
+ *          1. Removed flag definitions from lines 22, 23, 24, and 26
+ *             (BD_NO_CHDIR, BD_NO_CLOSE_FILES, BD_NO_REOPEN_STD_FDS, BD_NO_UMASK0)
+ *             to use the default daemon behavior.
+ *           2. Added pipe signaling mechanism
  *   - Original source: https://github.com/bradfa/tlpi-dist/blob/a00ffc86b77ef407792a9bbd87f39326ba6dd481/daemons/become_daemon.h
  *   - License: This modified file remains under GNU LGPL v3 or later (see COPYING.lgpl-v3)
  *
@@ -41,36 +43,58 @@ int                                     /* Returns 0 on success, -1 on error */
 becomeDaemon()
 {
     int maxfd, fd;
+    int pipefd[2];
+    char unit_buf;
 
-    switch (fork()) {                   /* Become background process */
-        case -1: return -1;
-        case 0:  break;                     /* Child falls through... */
-        default: _exit(EXIT_SUCCESS);       /* while parent terminates */
+    if (pipe(pipefd) == -1) {
+        return -1;
     }
 
-    if (setsid() == -1)                 /* Become leader of new session */
+    switch (fork()) {                   // Become background process
+        case -1: return -1;
+        case 0:
+            close(pipefd[0]);           // Child closes read end
+            break;                      // Child falls through...
+        default:
+            close(pipefd[1]);           // Parent closes write end
+            read(pipefd[0], &unit_buf, 1); // Wait for grandchild signal
+            close(pipefd[0]);
+            _exit(EXIT_SUCCESS);        // Parent terminates
+    }
+
+    if (setsid() == -1)                 // Become leader of new session
         return -1;
 
-    switch (fork()) {                   /* Ensure we are not session leader */
+    switch (fork()) {                   // Ensure we are not session leader
         case -1: return -1;
-        case 0:  break;
-        default: _exit(EXIT_SUCCESS);
+        case 0:  
+            // Grandchild keeps pipefd[1] open to signal original parent
+            break;
+        default: 
+            // Second child exits immediately
+            close(pipefd[1]);           // Close pipe before exiting
+            _exit(EXIT_SUCCESS);
     }
+
+    // Only the grandchild (final daemon) reaches here with pipefd[1] still open
 
     maxfd = sysconf(_SC_OPEN_MAX);
-    if (maxfd == -1) {                /* Limit is indeterminate... */
-        maxfd = BD_MAX_CLOSE;         /* so take a guess */
+    if (maxfd == -1) {
+        maxfd = BD_MAX_CLOSE;
     }
 
+    // Close all file descriptors EXCEPT the pipe write end
     for (fd = 0; fd < maxfd; fd++) {
-        close(fd);
+        if (fd != pipefd[1]) {
+            close(fd);
+        }
     }
 
-    close(STDIN_FILENO);            /* Reopen standard fd's to /dev/null */
+    close(STDIN_FILENO);
 
     fd = open("/dev/null", O_RDWR);
 
-    if (fd != STDIN_FILENO) {  /* 'fd' should be 0 */
+    if (fd != STDIN_FILENO) {
         return -1;
     }
 
@@ -82,5 +106,5 @@ becomeDaemon()
         return -1;
     }
 
-    return 0;
+    return pipefd[1];  // Return pipe write end to signal parent
 }

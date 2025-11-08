@@ -46,6 +46,7 @@ struct file_context {
 
 static volatile sig_atomic_t sigint_or_sigterm_recved = 0;
 static volatile sig_atomic_t sign_recved = 0;
+int daemon_pipe_fd = -1;
 
 static void
 signal_handler(int sig) {
@@ -55,7 +56,7 @@ signal_handler(int sig) {
 
 int main(int argc, char ** argv) {
   if (argc > 1 && strcmp(argv[1], "-d") == 0) {
-    becomeDaemon();
+    daemon_pipe_fd = becomeDaemon();
     syslog(LOG_INFO, "Starting server as daemon with PID %d", getpid());
   } else {
     syslog(LOG_INFO, "Starting server as foreground process");
@@ -96,6 +97,13 @@ int main(int argc, char ** argv) {
 
   if (aesd_server != NULL) {
     syslog(LOG_INFO, "Server created sucessfully");
+
+    // Signal parent that daemon is ready
+    if (daemon_pipe_fd != -1) {
+        char dummy = 'X';
+        write(daemon_pipe_fd, &dummy, 1);
+        close(daemon_pipe_fd);
+    }
   }
 
   int get_line_ret = AESD_SERVER_RET_EOL_NOT_FOUND;
