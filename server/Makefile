@@ -1,5 +1,8 @@
-CC := gcc
-CFLAGS := -Wall -Werror -g -I include
+CC ?= gcc
+AR ?= ar
+CFLAGS += -Wall -Werror -g
+LDFLAGS ?=
+INCLUDES := -I include
 
 
 vpath %.c src
@@ -10,23 +13,23 @@ vpath %.h include
 
 all: aesdsocket
 
-aesdsocket: main.c libaesdserver.a libdaemon.a
-	$(CC) $(CFLAGS) -o $@ $^
+aesdsocket: main.c libaesdserver.a libbecomedaemon.a
+	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $^
 
 libaesdserver.a: server.o
-	ar rcs $@ $<
+	$(AR) rcs $@ $<
 
 server.o: server.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-libdaemon.a: become_daemon.o
-	ar rcs $@ $<
+libbecomedaemon.a: become_daemon.o
+	$(AR) rcs $@ $<
 
 become_daemon.o: become_daemon.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 clean:
-	rm -f aesdsocket server.o libaesdserver.a l
+	rm -f aesdsocket server.o libaesdserver.a libbecomedaemon.a become_daemon.o
 
 # Automatic variables:
 # $@ The filename representing the target.
